@@ -1,0 +1,43 @@
+name: UptoPlay Autopilot
+on:
+  workflow_dispatch: # Lancement manuel
+  schedule:
+    - cron: "0 0 */6 * *" # Se relance tous les 6 jours à 00h00 UTC
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360 # Limite maximale de 6h (limite GitHub)
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Dependencies
+        run: |
+          npm init -y
+          npm install puppeteer puppeteer-extra puppeteer-extra-plugin-stealth
+      - name: Install Chrome & Xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb google-chrome-stable
+      - name: Continuous Run Loop with Hard Reset
+        run: |
+          # Cette boucle s'exécute tant que le job est vivant
+          while true; do
+            echo "--- NETTOYAGE COMPLET DES PROCESSUS ---"
+            # Tue tous les restes de Chrome, Xvfb ou Node des cycles précédents
+            sudo pkill -9 chrome || true
+            sudo pkill -9 google-chrome || true
+            sudo pkill -9 Xvfb || true
+            echo "--- MISE À JOUT DES PERMISSIONS ---"
+            # Parfois nécessaire pour éviter les erreurs de sandbox
+            sudo chmod -R 777 /dev/shm || true
+            echo "--- DÉMARRAGE DU SCRIPT JS ---"
+            # Lancement via xvfb pour la gestion de l'affichage virtuel
+            # timeout 5h40 pour laisser le temps au YAML de se relancer proprement
+            timeout 340m xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" node scrypt3.js || echo "Cycle terminé ou timeout atteint"
+            echo "--- REPOS ET PURGE RAM (30 SECONDES) ---"
+            sleep 30
+          done
